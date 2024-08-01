@@ -4,6 +4,10 @@
 admin
 test
 ```
+## token
+```
+sqp_f55ba45dd77c7b7785478b6f8e9a836c4c3aa070
+```
 ## maven
 ```
 mvn clean verify sonar:sonar -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=sqp_f55ba45dd77c7b7785478b6f8e9a836c4c3aa070
