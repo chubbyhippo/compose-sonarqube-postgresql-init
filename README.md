@@ -2,7 +2,7 @@
 ## user/pass
 ```
 admin
-test
+777777777aA_
 ```
 ## token
 ```
