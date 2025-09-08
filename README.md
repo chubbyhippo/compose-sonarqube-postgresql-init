@@ -6,7 +6,7 @@ admin
 ```
 ## token
 ```
-sqp_f55ba45dd77c7b7785478b6f8e9a836c4c3aa070
+sqp_87765b5ff81b753f3fa7c52f802534fb065403c0
 ```
 ## maven
 ```sh
