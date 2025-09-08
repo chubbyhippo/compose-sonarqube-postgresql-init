@@ -1,20 +1,20 @@
 # Using sonar
 ## user/pass
 ```
-admin
-777777777aA_
+user
+password
 ```
 ## token
 ```
-sqp_87765b5ff81b753f3fa7c52f802534fb065403c0
+token
 ```
 ## maven
 ```sh
-mvn clean verify sonar:sonar -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=sqp_87765b5ff81b753f3fa7c52f802534fb065403c0
+mvn clean verify sonar:sonar -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=token
 ```
 ## gradle
 ```sh
-gradle test jacocoTestReport sonar -Dsonar.gradle.skipCompile=true -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=sqp_87765b5ff81b753f3fa7c52f802534fb065403c0
+gradle test jacocoTestReport sonar -Dsonar.gradle.skipCompile=true -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=token
 ```
 # Updating sonar
 ## remove init.sql
