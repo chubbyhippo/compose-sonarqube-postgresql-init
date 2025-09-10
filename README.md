@@ -29,7 +29,7 @@ git push origin --force --tags
 ```
 ## update init.sql
 ```sh
-PGPASSWORD=sonar pg_dump -h localhost -p 6666 -U sonar -d sonar -f init.sql
+PGPASSWORD=sonar pg_dump -h localhost -p 7777 -U sonar -d sonar -f init.sql
 ```
 
 
