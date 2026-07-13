@@ -63,7 +63,7 @@ while [ "$i" -lt 120 ]; do
         migrated=1
       fi ;;
   esac
-  state=$(docker compose ps --format '{{.State}}' sonarqube 2>/dev/null || true)
+  state=$(docker compose ps -a --format '{{.State}}' sonarqube 2>/dev/null || true)
   case "$state" in
     exited|dead)
       echo "SonarQube container stopped unexpectedly; last logs:"
@@ -156,4 +156,5 @@ say "done"
 echo "  url:    $URL"
 echo "  login:  $SONAR_USER / $SONAR_PASS   (built-in admin account is deactivated)"
 echo "  token:  stored in $TOKEN_FILE"
+echo '  env:    eval "$(./env.sh)"   (exports SONAR_TOKEN + SONAR_HOST_URL)'
 echo "  scan:   mvn clean verify sonar:sonar -Dsonar.projectKey=test -Dsonar.host.url=$URL -Dsonar.token=\$(cat $TOKEN_FILE)"

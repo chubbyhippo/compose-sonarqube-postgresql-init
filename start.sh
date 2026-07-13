@@ -34,6 +34,9 @@ while [ "$i" -lt 120 ]; do
     UP)
       printf '\n'
       echo "SonarQube ready at $URL"
+      if [ -s .sonar-token ]; then
+        echo 'to export SONAR_TOKEN into this shell: eval "$(./env.sh)"'
+      fi
       exit 0 ;;
     DB_MIGRATION_NEEDED)
       if [ -z "$migrated" ]; then
@@ -42,7 +45,7 @@ while [ "$i" -lt 120 ]; do
         migrated=1
       fi ;;
   esac
-  state=$(docker compose ps --format '{{.State}}' sonarqube 2>/dev/null || true)
+  state=$(docker compose ps -a --format '{{.State}}' sonarqube 2>/dev/null || true)
   case "$state" in
     exited|dead)
       printf '\n'

@@ -26,6 +26,13 @@ test
 
 ## Token
 `setup.sh` writes an analysis token to `.sonar-token` (git-ignored, chmod 600).
+Export it into your current shell with:
+```sh
+eval "$(./env.sh)"
+```
+This sets `SONAR_TOKEN` and `SONAR_HOST_URL`, which the sonar scanners read
+automatically - the `-Dsonar.token`/`-Dsonar.host.url` flags below can then
+be dropped.
 
 ## Maven
 ```sh
