@@ -14,8 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# Stops the stack. Containers and data are kept; ./start.sh resumes.
 set -eu
 cd "$(dirname "$0")"
 docker compose stop

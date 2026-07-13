@@ -15,10 +15,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# REPLACES the SonarQube database with the given pg_dump SQL file, wipes
-# the search index so it rebuilds from the restored data, and restarts
-# SonarQube. Credentials/tokens become whatever the dump contains.
-# Usage: ./importdb.sh <dump.sql>
+# usage: ./importdb.sh <dump.sql>, replaces the database
 set -eu
 cd "$(dirname "$0")"
 
@@ -29,24 +26,25 @@ fi
 IN=$1
 
 if ! head -n 5 "$IN" | grep -q 'PostgreSQL database dump'; then
-  echo "$IN does not look like a pg_dump SQL file"
+  echo "$IN is not a pg_dump file"
   exit 1
 fi
 
+docker compose config --services | grep -qx db || { echo "no db service in this compose file"; exit 1; }
 docker compose up -d --wait db
 
-echo "stopping SonarQube"
+echo "stopping sonarqube"
 docker compose stop sonarqube
 
-echo "recreating database from $IN"
+echo "restoring $IN"
 docker compose exec -T db psql -U sonar -d postgres -q -v ON_ERROR_STOP=1 \
   -c 'DROP DATABASE IF EXISTS sonar WITH (FORCE);'
 docker compose exec -T db psql -U sonar -d postgres -q -v ON_ERROR_STOP=1 \
   -c 'CREATE DATABASE sonar OWNER sonar;'
 docker compose exec -T db psql -U sonar -d sonar -q -v ON_ERROR_STOP=1 < "$IN" >/dev/null
 
-echo "clearing search index (rebuilt on next start)"
+echo "clearing search index"
 docker compose run --rm --no-deps --entrypoint /bin/sh sonarqube -c 'rm -rf /opt/sonarqube/data/es*'
 
 ./start.sh
-echo "import done - credentials and tokens are whatever the dump contains"
+echo "imported $IN"

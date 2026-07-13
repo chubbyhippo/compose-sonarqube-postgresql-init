@@ -15,17 +15,12 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# Prints export statements for the SonarQube token and server URL.
-# A child process cannot modify its parent shell's environment, so load
-# these into your current shell with:
-#   eval "$(./env.sh)"
-# The sonar scanners (CLI/Maven/Gradle) read SONAR_TOKEN and SONAR_HOST_URL
-# automatically. On failure nothing is printed and the error goes to stderr.
+# usage: eval "$(./env.sh)"
 set -eu
 cd "$(dirname "$0")"
 
 if [ ! -s .sonar-token ]; then
-  echo "no .sonar-token found - run ./setup.sh first" >&2
+  echo "no .sonar-token, run ./setup.sh first" >&2
   exit 1
 fi
 printf "export SONAR_TOKEN='%s'\n" "$(cat .sonar-token)"

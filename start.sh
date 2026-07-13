@@ -14,9 +14,6 @@
 #
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
-#
-# Starts the stack and waits until SonarQube answers. Triggers a database
-# migration automatically after an image upgrade.
 set -eu
 cd "$(dirname "$0")"
 
@@ -24,7 +21,7 @@ URL=http://localhost:9000
 
 docker compose up -d
 
-printf 'waiting for SonarQube'
+printf 'waiting for sonarqube'
 migrated=""
 i=0
 while [ "$i" -lt 120 ]; do
@@ -33,14 +30,14 @@ while [ "$i" -lt 120 ]; do
   case "$status" in
     UP)
       printf '\n'
-      echo "SonarQube ready at $URL"
+      echo "ready at $URL"
       if [ -s .sonar-token ]; then
-        echo 'to export SONAR_TOKEN into this shell: eval "$(./env.sh)"'
+        echo 'eval "$(./env.sh)" to export SONAR_TOKEN'
       fi
       exit 0 ;;
     DB_MIGRATION_NEEDED)
       if [ -z "$migrated" ]; then
-        printf '\ntriggering database migration\n'
+        printf '\nmigrating database\n'
         curl -s -X POST "$URL/api/system/migrate_db" >/dev/null || true
         migrated=1
       fi ;;
@@ -49,7 +46,7 @@ while [ "$i" -lt 120 ]; do
   case "$state" in
     exited|dead)
       printf '\n'
-      echo "SonarQube container stopped unexpectedly; last logs:"
+      echo "sonarqube died, logs:"
       docker compose logs --no-color --tail 25 sonarqube || true
       exit 1 ;;
   esac
@@ -57,5 +54,5 @@ while [ "$i" -lt 120 ]; do
   sleep 5
 done
 printf '\n'
-echo "timed out - check: docker compose logs sonarqube"
+echo "timed out, check: docker compose logs sonarqube"
 exit 1

@@ -15,10 +15,7 @@
 # You should have received a copy of the GNU General Public License along
 # with this program.  If not, see <https://www.gnu.org/licenses/>.
 #
-# First-time setup: starts the stack, creates the test/test user, gives it
-# admin rights, neutralizes the default admin password, and writes an
-# analysis token to .sonar-token. Leaves SonarQube running when done.
-# Safe to re-run: skips whatever is already configured.
+# first-time setup, safe to re-run
 set -eu
 cd "$(dirname "$0")"
 
@@ -33,21 +30,21 @@ trap 'rm -f "$RESP"' EXIT INT HUP TERM
 
 say() { printf '\n== %s\n' "$*"; }
 
-command -v docker >/dev/null 2>&1 || { echo "docker not found in PATH"; exit 1; }
-docker compose version >/dev/null 2>&1 || { echo "docker compose v2 not available"; exit 1; }
+command -v docker >/dev/null 2>&1 || { echo "docker not found"; exit 1; }
+docker compose version >/dev/null 2>&1 || { echo "docker compose not found"; exit 1; }
 
-# SonarQube's embedded Elasticsearch refuses to start below this
+# elasticsearch won't start below this
 REQUIRED_MAP_COUNT=524288
 current=$(sysctl -n vm.max_map_count 2>/dev/null || echo 0)
 if [ "$current" -lt "$REQUIRED_MAP_COUNT" ]; then
-  say "raising vm.max_map_count from $current to $REQUIRED_MAP_COUNT (needs sudo)"
+  say "raising vm.max_map_count to $REQUIRED_MAP_COUNT"
   sudo sysctl -w vm.max_map_count="$REQUIRED_MAP_COUNT"
 fi
 
 say "starting containers"
 docker compose up -d
 
-say "waiting for SonarQube at $URL"
+say "waiting for sonarqube"
 migrated=""
 status=""
 i=0
@@ -58,7 +55,7 @@ while [ "$i" -lt 120 ]; do
     UP) break ;;
     DB_MIGRATION_NEEDED)
       if [ -z "$migrated" ]; then
-        say "database migration needed - triggering it"
+        say "migrating database"
         curl -s -X POST "$URL/api/system/migrate_db" >/dev/null || true
         migrated=1
       fi ;;
@@ -66,23 +63,22 @@ while [ "$i" -lt 120 ]; do
   state=$(docker compose ps -a --format '{{.State}}' sonarqube 2>/dev/null || true)
   case "$state" in
     exited|dead)
-      echo "SonarQube container stopped unexpectedly; last logs:"
+      echo "sonarqube died, logs:"
       docker compose logs --no-color --tail 25 sonarqube || true
       exit 1 ;;
   esac
   sleep 5
 done
 if [ "$status" != "UP" ]; then
-  echo "timed out waiting for SonarQube; last logs:"
+  echo "timed out, logs:"
   docker compose logs --tail 30 sonarqube || true
   exit 1
 fi
-echo "SonarQube $(curl -s "$URL/api/server/version") is UP"
+echo "sonarqube $(curl -s "$URL/api/server/version") is up"
 
 valid() { curl -s -u "$1:$2" "$URL/api/authentication/validate" | grep -q '"valid":true'; }
 
-# req METHOD URL USER:PASS [curl args...]
-# response body ends up in $body; fails when http status >= 400
+# req METHOD URL USER:PASS [curl args...], body in $body, fails on http >= 400
 req() {
   req_method=$1; req_url=$2; req_auth=$3
   shift 3
@@ -91,59 +87,57 @@ req() {
   [ "$req_code" -lt 400 ]
 }
 
-# id of the JSON object (on stdin) whose field $1 equals $2
+# id of the json object whose field $1 equals $2
 obj_id() { tr '{' '\n' | grep "\"$1\":\"$2\"" | head -n 1 | tr ',' '\n' | sed -n 's/.*"id":"\([^"]*\)".*/\1/p' | head -n 1; }
 
 if valid "$SONAR_USER" "$SONAR_PASS"; then
-  say "user $SONAR_USER/$SONAR_PASS already works - skipping account setup"
+  say "user $SONAR_USER already set up"
 else
   if ! valid admin admin; then
-    echo "neither $SONAR_USER/$SONAR_PASS nor admin/admin can log in."
-    echo "this instance was configured with different credentials."
-    echo "full reset: docker compose down -v && ./setup.sh"
+    echo "cannot log in with $SONAR_USER/$SONAR_PASS or admin/admin"
+    echo "reset with: docker compose down -v && ./setup.sh"
     exit 1
   fi
 
   say "creating user $SONAR_USER"
   if ! req POST "$URL/api/users/create" admin:admin \
        --data "login=$SONAR_USER&name=$SONAR_USER&password=$SONAR_PASS"; then
-    # v1 endpoint removed in newer versions - fall back to v2
+    # v2 fallback for versions without the v1 api
     req POST "$URL/api/v2/users-management/users" admin:admin \
       -H 'Content-Type: application/json' \
       --data "{\"login\":\"$SONAR_USER\",\"name\":\"$SONAR_USER\",\"password\":\"$SONAR_PASS\"}" \
       || { echo "user creation failed: $body"; exit 1; }
   fi
 
-  say "granting administrator rights to $SONAR_USER"
+  say "granting admin rights"
   if ! req POST "$URL/api/user_groups/add_user" admin:admin \
        --data "name=sonar-administrators&login=$SONAR_USER"; then
-    # v1 endpoint removed in newer versions - fall back to v2
     gid=$(curl -s -u admin:admin "$URL/api/v2/authorizations/groups?q=sonar-administrators" | obj_id name sonar-administrators || true)
     uid=$(curl -s -u admin:admin "$URL/api/v2/users-management/users?q=$SONAR_USER" | obj_id login "$SONAR_USER" || true)
-    if [ -z "$gid" ] || [ -z "$uid" ]; then echo "could not resolve group/user ids"; exit 1; fi
+    if [ -z "$gid" ] || [ -z "$uid" ]; then echo "could not resolve ids"; exit 1; fi
     req POST "$URL/api/v2/authorizations/group-memberships" admin:admin \
       -H 'Content-Type: application/json' \
       --data "{\"userId\":\"$uid\",\"groupId\":\"$gid\"}" \
       || { echo "granting admin rights failed: $body"; exit 1; }
   fi
 
-  valid "$SONAR_USER" "$SONAR_PASS" || { echo "sanity check failed: $SONAR_USER cannot log in"; exit 1; }
+  valid "$SONAR_USER" "$SONAR_PASS" || { echo "$SONAR_USER cannot log in"; exit 1; }
 fi
 
-# runs on every invocation so a partially configured instance gets repaired
 if valid admin admin; then
-  say "deactivating built-in admin account (still has default password)"
+  say "deactivating built-in admin"
   if ! req POST "$URL/api/users/deactivate" "$SONAR_USER:$SONAR_PASS" --data "login=admin"; then
-    # v1 endpoint removed in newer versions - fall back to v2
     admin_id=$(curl -s -u "$SONAR_USER:$SONAR_PASS" "$URL/api/v2/users-management/users?q=admin" | obj_id login admin || true)
-    [ -n "$admin_id" ] || { echo "could not resolve admin user id"; exit 1; }
+    [ -n "$admin_id" ] || { echo "could not resolve admin id"; exit 1; }
     req DELETE "$URL/api/v2/users-management/users/$admin_id" "$SONAR_USER:$SONAR_PASS" \
       || { echo "deactivating admin failed: $body"; exit 1; }
   fi
 fi
 
-if [ ! -s "$TOKEN_FILE" ]; then
-  say "generating analysis token -> $TOKEN_FILE"
+token_valid() { [ -s "$TOKEN_FILE" ] && curl -s -u "$(cat "$TOKEN_FILE"):" "$URL/api/authentication/validate" | grep -q '"valid":true'; }
+
+if ! token_valid; then
+  say "generating token"
   curl -s -u "$SONAR_USER:$SONAR_PASS" -X POST "$URL/api/user_tokens/revoke" --data "name=$TOKEN_NAME" >/dev/null || true
   resp=$(curl -s -u "$SONAR_USER:$SONAR_PASS" -X POST "$URL/api/user_tokens/generate" --data "name=$TOKEN_NAME" || true)
   token=$(printf '%s' "$resp" | tr ',' '\n' | sed -n 's/.*"token":"\([^"]*\)".*/\1/p' | head -n 1 || true)
@@ -153,8 +147,7 @@ if [ ! -s "$TOKEN_FILE" ]; then
 fi
 
 say "done"
-echo "  url:    $URL"
-echo "  login:  $SONAR_USER / $SONAR_PASS   (built-in admin account is deactivated)"
-echo "  token:  stored in $TOKEN_FILE"
-echo '  env:    eval "$(./env.sh)"   (exports SONAR_TOKEN + SONAR_HOST_URL)'
-echo "  scan:   mvn clean verify sonar:sonar -Dsonar.projectKey=test -Dsonar.host.url=$URL -Dsonar.token=\$(cat $TOKEN_FILE)"
+echo "  $URL"
+echo "  $SONAR_USER / $SONAR_PASS"
+echo "  token in $TOKEN_FILE"
+echo '  eval "$(./env.sh)" to export SONAR_TOKEN'

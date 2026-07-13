@@ -1,67 +1,57 @@
-# SonarQube + PostgreSQL
-
-Local SonarQube (community build) on Docker Compose. All state lives in
-named docker volumes - no database dumps, nothing secret in git.
-
-## First time
+# Using sonar
+## first time
 ```sh
 ./setup.sh
 ```
-Starts the stack and configures everything (user, admin password, token).
-Re-running it is safe; it skips whatever is already done.
-
-## Afterwards
+## start/stop
 ```sh
 ./start.sh
+```
+```sh
 ./stop.sh
 ```
-
-## Login
+## user/pass
 http://localhost:9000
 ```
 test
 test
 ```
-`setup.sh` deactivates the built-in `admin` account (`test` is an administrator).
-
-## Token
-`setup.sh` writes an analysis token to `.sonar-token` (git-ignored, chmod 600).
-Export it into your current shell with:
+## token
 ```sh
 eval "$(./env.sh)"
 ```
-This sets `SONAR_TOKEN` and `SONAR_HOST_URL`, which the sonar scanners read
-automatically - the `-Dsonar.token`/`-Dsonar.host.url` flags below can then
-be dropped.
-
-## Maven
+exports SONAR_TOKEN and SONAR_HOST_URL, the scanners pick them up
+## maven
 ```sh
 mvn clean verify sonar:sonar -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=$(cat .sonar-token)
 ```
-
-## Gradle
+## gradle
 ```sh
 gradle test jacocoTestReport sonar -Dsonar.gradle.skipCompile=true -Dsonar.projectKey=test -Dsonar.projectName='test' -Dsonar.host.url=http://localhost:9000 -Dsonar.token=$(cat .sonar-token)
 ```
-
-## Backup / restore
+# Maintaining sonar
+## export/import db
 ```sh
-./exportdb.sh                # dump the database to sonar-<timestamp>.sql
-./importdb.sh <dump.sql>     # REPLACE the database with a dump and restart
+./exportdb.sh
 ```
-Dumps are plain `pg_dump` SQL and git-ignored. Importing a dump from an
-older SonarQube version triggers the database migration on start - but only
-within SonarQube's supported upgrade path; otherwise the startup log names
-the intermediate version to go through first.
-
-## Upgrading SonarQube
-Bump the `sonarqube:` image tag in `compose.yaml`, then `./start.sh` -
-if the new version needs a database migration it is triggered automatically.
-
-## Full reset
+```sh
+./importdb.sh dump.sql
+```
+imports must be within sonarqube's supported upgrade path
+## upgrade
+bump the image tag in compose.yaml, then
+```sh
+./start.sh
+```
+## reset
 ```sh
 docker compose down -v && ./setup.sh
 ```
-
-## License
-GPL-3.0-or-later - see [LICENSE](LICENSE). Scripts are POSIX sh.
+# H2 variant
+evaluation only, no export/import, data does not survive upgrades
+```sh
+COMPOSE_FILE=compose-h2.yaml ./setup.sh
+```
+same for start.sh/stop.sh, rerun setup.sh after switching variants
+# License
+GPL-3.0-or-later, see [LICENSE](LICENSE)
